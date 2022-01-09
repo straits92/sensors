@@ -9,22 +9,36 @@ import os
 import time
 import datetime
 import json
-import os.path
+import os.path # not necessary?
+
+# for the sensors
 import Adafruit_DHT
 
+# $ sudo apt-get install build-essential python-dev python-openssl git ???
+# $ pip3 install adafruit-circuitpython-dht
+# $ sudo apt-get install libgpiod2
+# import adafruit-dht
+# import board
+
 # network and directory info; local server or tunneling to internet
-WLAN_IP = "192.168.1.157"
+WLAN_IP = "192.168.1.157" # static IP for Raspberry Pi Zero W
+WLAN_IP_4B = "192.168.1.158" # static IP for Raspberry Pi 4B
 subdir = "/sensordata"
 prefix = "/sensordata_"
 local_link_hourly = WLAN_IP+prefix+"hourly.json"
 local_link_instant = WLAN_IP+prefix+"instant.json"
 local_link_12hr = WLAN_IP+prefix+"12hr.json"
 
-# sensor and time constants
+# time constants
 READ_INTERVAL_SECONDS = 120
 TIMEZONE = "+01:00"
+
+# sensors
 DHT_SENSOR = Adafruit_DHT.DHT22
 DHT_PIN = 4
+# dhtDevice = adafruit_dht.DHT22(board.D4, use_pulseio=False) # for GPIO4. Also, pulseio may be needed for raspberry
+
+
 
 
 ### function definitions ###
@@ -85,7 +99,6 @@ def write_json(new_data, filename):
 
 	return
 
-
 def construct_data_point(temperature, humidity, epoch_time, date, hms, link):
 	# format the data and pack into json object, then into json array 
 	# which should be in destination file.
@@ -125,6 +138,9 @@ while True:
 	# query the sensor
 	try: 
 		humidity_raw, temperature_raw = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN)
+		# temperature_raw = dhtDevice.temperature
+		# humidity_raw = dhtDevice.humidity
+
 		humidity = round(humidity_raw, 1)
 		temperature = round(temperature_raw, 1)
 		print("Raw temperature {}*C, raw humidity {}%".format(temperature_raw, humidity_raw))
