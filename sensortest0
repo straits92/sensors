@@ -1,0 +1,28 @@
+server {
+listen 80 default_server;
+listen [::] default_server;
+root /home/pi/Desktop/sensors/sensordata;
+index index.html;
+server_name sensortest0;
+location / {
+try_files $uri $uri/ =404;
+}
+
+# overriding headers
+location = /sensordata_hourly.json {
+	# override Content-Type
+	types {}
+#	default_type application/json+charset=utf-8;
+	add_header Content-Type "application/json; charset=utf-8";
+
+}
+
+location = /sensordata_instant.json {
+	# override Content-Type
+#	types { } default_type "application/json; charset=utf-8";
+	add_header Content-Type "application/json; charset=utf-8";
+
+}
+
+
+}

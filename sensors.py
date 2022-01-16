@@ -1,45 +1,47 @@
 # temperature and humidity sensor reading and storing as json
-# run it from cmdline with python3 ~/sensors.py
-# manage how the data is served via nginx, in directory 
-# /etc/nginx/sites-enabled/sensortest0
-# transfer over to main PC via: 
-# "scp pi@192.168.1.157:/home/pi/Desktop/sensors [destination]"
 
-import os
+# Set-up instructions:
+# run script from cmdline:
+# python3 ~/sensors.py
+# manage how the data is served via nginx, in directory: 
+# /etc/nginx/sites-enabled/sensortest0
+# make nginx server available via ngrok:
+# ngrok http http://192.168.1.158:80 -host-header="192.168.1.158:80"
+# if needed transfer over to main PC via: 
+# "scp pi@192.168.1.158:/home/pi/Desktop/sensors [destination]"
+
+import os # os.path may be needed
 import time
 import datetime
 import json
-import os.path # not necessary?
 
 # for the sensors
-import Adafruit_DHT
-
-# $ sudo apt-get install build-essential python-dev python-openssl git ???
+# $ sudo apt-get install build-essential python-dev python-openssl git
 # $ pip3 install adafruit-circuitpython-dht
 # $ sudo apt-get install libgpiod2
-# import adafruit-dht
-# import board
+import adafruit_dht
+import board
 
 # network and directory info; local server or tunneling to internet
 WLAN_IP = "192.168.1.157" # static IP for Raspberry Pi Zero W
 WLAN_IP_4B = "192.168.1.158" # static IP for Raspberry Pi 4B
 subdir = "/sensordata"
 prefix = "/sensordata_"
-local_link_hourly = WLAN_IP+prefix+"hourly.json"
-local_link_instant = WLAN_IP+prefix+"instant.json"
-local_link_12hr = WLAN_IP+prefix+"12hr.json"
+local_link_hourly = WLAN_IP_4B+prefix+"hourly.json"
+local_link_instant = WLAN_IP_4B+prefix+"instant.json"
+local_link_12hr = WLAN_IP_4B+prefix+"12hr.json"
 
 # time constants
-READ_INTERVAL_SECONDS = 120
+READ_INTERVAL_SECONDS = 900 # every 15 minutes
+CORRECTION_INTERVAL = 5 # if failed, try 5 seconds later
 TIMEZONE = "+01:00"
 
-# sensors
-DHT_SENSOR = Adafruit_DHT.DHT22
-DHT_PIN = 4
-# dhtDevice = adafruit_dht.DHT22(board.D4, use_pulseio=False) # for GPIO4. Also, pulseio may be needed for raspberry
+# sensors with old library Adafruit_DHT
+# DHT_SENSOR = Adafruit_DHT.DHT22
+# DHT_PIN = 4
 
-
-
+# for GPIO4. Also, pulseio may be needed for raspberry
+dhtDevice = adafruit_dht.DHT22(board.D4, use_pulseio=False) 
 
 ### function definitions ###
 # scan list of data points for hour; delete points beyond period
@@ -137,17 +139,19 @@ current_hour = 0
 while True:
 	# query the sensor
 	try: 
-		humidity_raw, temperature_raw = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN)
-		# temperature_raw = dhtDevice.temperature
-		# humidity_raw = dhtDevice.humidity
-
+		# humidity_raw, temperature_raw = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN)
+		temperature_raw = dhtDevice.temperature
+		humidity_raw = dhtDevice.humidity
 		humidity = round(humidity_raw, 1)
 		temperature = round(temperature_raw, 1)
 		print("Raw temperature {}*C, raw humidity {}%".format(temperature_raw, humidity_raw))
 	except:
-		temperature = 10
-		humidity = 50
-		print("Sensor reading failed. Default to placeholder temperature[%d]/humidity[%d]",temperature, humidity)
+		print("Sensor reading failed. Skip iteration and re-read in a few seconds.")
+		time.sleep(CORRECTION_INTERVAL)
+		continue;
+		# temperature = 10
+		# humidity = 50
+		# print("Sensor reading failed. Default to placeholder temperature[%d]/humidity[%d]",temperature, humidity)
 
 
 	if temperature is not None and humidity is not None:
@@ -155,19 +159,24 @@ while True:
 		# to avoid time edge cases, get time info here for the iteration
 		epoch_time = int(time.time())
 		date = time.strftime('%y-%m-%d')
+		date_extended = "20{}".format(date);
 		hms = time.strftime('%H:%M:%S')
 		
 		# check hours, to formulate instant, hourly, daily response
 		now = datetime.datetime.now()
 		past_hour = current_hour
 		current_hour = now.hour
-		print("The time now is date [{}], hour [{}]".format(date, current_hour))
+		hms_hour = ("{}:00:00").format(current_hour)
+		epoch_time_hour = epoch_time - (epoch_time%3600)
+		print("The time now is date [{}], hms_hour [{}], epoch hour [{}]".format(date_extended, hms_hour, epoch_time_hour))
 
 		# construct json object for sensor reading
-		data_point = construct_data_point(temperature, humidity, epoch_time, date, hms, local_link_hourly)
+		data_point = construct_data_point(temperature, humidity, epoch_time, date_extended, hms, local_link_hourly)
+		data_point_hourly = construct_data_point(temperature, humidity, epoch_time_hour, date_extended, hms_hour, local_link_hourly)
+
 		
 		# formulate filenames, write to files
-		filename_rawdata = abspath+prefix+date+TIMEZONE+".json" # create its own subfolder?
+		filename_rawdata = abspath+prefix+date+TIMEZONE+".json" 
 		filename_instant = abspath+prefix+"instant"+".json" 		
 		write_json(data_point, filename_rawdata)
 		overwrite_json(data_point, filename_instant)
@@ -176,7 +185,7 @@ while True:
 		if past_hour != current_hour: 
 			print("Hourly data point being written")
 			filename_hourly = abspath+prefix+"hourly"+".json"
-			overwrite_json(data_point, filename_hourly)
+			overwrite_json(data_point_hourly, filename_hourly)
 			
 			# update on hourly basis for a 12/24hr response. wipe entries
 			# older than the 12/24hr period, and append this hour's entry
