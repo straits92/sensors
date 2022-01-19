@@ -32,7 +32,7 @@ local_link_instant = WLAN_IP_4B+prefix+"instant.json"
 local_link_12hr = WLAN_IP_4B+prefix+"12hr.json"
 
 # time constants
-READ_INTERVAL_SECONDS = 900 # every 15 minutes
+READ_INTERVAL_SECONDS = 60 # every 1 minutes
 CORRECTION_INTERVAL = 5 # if failed, try 5 seconds later
 TIMEZONE = "+01:00"
 
@@ -168,7 +168,7 @@ while True:
 		current_hour = now.hour
 		hms_hour = ("{}:00:00").format(current_hour)
 		epoch_time_hour = epoch_time - (epoch_time%3600)
-		print("The time now is date [{}], hms_hour [{}], epoch hour [{}]".format(date_extended, hms_hour, epoch_time_hour))
+		print("The time now is date [{}], hms_hour [{}], epoch hour [{}], actual time [{}]".format(date_extended, hms_hour, epoch_time_hour, hms))
 
 		# construct json object for sensor reading
 		data_point = construct_data_point(temperature, humidity, epoch_time, date_extended, hms, local_link_hourly)
