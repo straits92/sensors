@@ -3,6 +3,11 @@
 # concurrent server program which delivers sensor data from a file
 # to remote clients. It needs to be set to executable via 
 # chmod +x <filename>
+# 
+# Necessary packages for sensors:
+# $ sudo apt-get install build-essential python-dev python-openssl git
+# $ pip3 install adafruit-circuitpython-dht
+# $ sudo apt-get install libgpiod2
 
 echo $(date)
 echo $BASH

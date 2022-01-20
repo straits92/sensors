@@ -7,18 +7,13 @@
 # /etc/nginx/sites-enabled/sensortest0
 # make nginx server available via ngrok:
 # ngrok http http://192.168.1.158:80 -host-header="192.168.1.158:80"
-# if needed transfer over to main PC via: 
-# "scp pi@192.168.1.158:/home/pi/Desktop/sensors [destination]"
 
 import os # os.path may be needed
 import time
 import datetime
 import json
 
-# for the sensors
-# $ sudo apt-get install build-essential python-dev python-openssl git
-# $ pip3 install adafruit-circuitpython-dht
-# $ sudo apt-get install libgpiod2
+# libraries for the sensors
 import adafruit_dht
 import board
 
@@ -36,9 +31,9 @@ READ_INTERVAL_SECONDS = 60 # every 1 minutes
 CORRECTION_INTERVAL = 5 # if failed, try 5 seconds later
 TIMEZONE = "+01:00"
 
-# sensors with old library Adafruit_DHT
-# DHT_SENSOR = Adafruit_DHT.DHT22
-# DHT_PIN = 4
+# housekeeping for successful sensor reading
+HOURLY_FAILURE_COUNT = 0
+TOTAL_FAILURE_COUNT = 0
 
 # for GPIO4. Also, pulseio may be needed for raspberry
 dhtDevice = adafruit_dht.DHT22(board.D4, use_pulseio=False) 
@@ -75,10 +70,7 @@ def overwrite_json(new_data, filename):
 	
 # create/open existing sensordata file; append data point to it
 def write_json(new_data, filename):
-	if os.path.isfile(filename):
-		print("File already open: "+ filename)
-		
-	else: 
+	if (os.path.isfile(filename)) is not True:
 		try: 
 			print("File does not exist. Open: "+filename)
 			with open(filename, 'w') as sensorfile:
@@ -126,33 +118,29 @@ def construct_data_point(temperature, humidity, epoch_time, date, hms, link):
 cwd = os.getcwd()
 abspath = cwd+subdir
 if (os.path.isdir(abspath)) is not True:
-	print("The following path does not exist: "+ abspath)
+	print("The following path does not exist: {}".format(abspath))
 	try: 
 		os.mkdir(abspath)
 	except OSError:
-		print("Creation of the directory failed: %s" % abspath)
+		print("Creation of the directory failed: {}".format(abspath))
 	else:
-		print("Successfully created the directory: %s" % abspath)
+		print("Successfully created the directory: {}".format(abspath))
 
 # sensor query and json write loop 
 current_hour = 0
 while True:
 	# query the sensor
 	try: 
-		# humidity_raw, temperature_raw = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN)
 		temperature_raw = dhtDevice.temperature
 		humidity_raw = dhtDevice.humidity
 		humidity = round(humidity_raw, 1)
 		temperature = round(temperature_raw, 1)
 		print("Raw temperature {}*C, raw humidity {}%".format(temperature_raw, humidity_raw))
 	except:
-		print("Sensor reading failed. Skip iteration and re-read in a few seconds.")
+		++TOTAL_FAILURE_COUNT
+		print("Sensor reading failed. Retry in {} secs. Total failure count: {}".format(CORRECTION_INTERVAL, TOTAL_FAILURE_COUNT))
 		time.sleep(CORRECTION_INTERVAL)
 		continue;
-		# temperature = 10
-		# humidity = 50
-		# print("Sensor reading failed. Default to placeholder temperature[%d]/humidity[%d]",temperature, humidity)
-
 
 	if temperature is not None and humidity is not None:
 				
@@ -168,12 +156,11 @@ while True:
 		current_hour = now.hour
 		hms_hour = ("{}:00:00").format(current_hour)
 		epoch_time_hour = epoch_time - (epoch_time%3600)
-		print("The time now is date [{}], hms_hour [{}], epoch hour [{}], actual time [{}]".format(date_extended, hms_hour, epoch_time_hour, hms))
+		print("Date [{}], epoch hour [{}], exact time [{}]".format(date_extended, epoch_time_hour, hms))
 
 		# construct json object for sensor reading
 		data_point = construct_data_point(temperature, humidity, epoch_time, date_extended, hms, local_link_hourly)
 		data_point_hourly = construct_data_point(temperature, humidity, epoch_time_hour, date_extended, hms_hour, local_link_hourly)
-
 		
 		# formulate filenames, write to files
 		filename_rawdata = abspath+prefix+date+TIMEZONE+".json" 
