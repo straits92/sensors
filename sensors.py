@@ -33,7 +33,7 @@ TIMEZONE = "+01:00"
 
 # housekeeping for successful sensor reading
 HOURLY_FAILURE_COUNT = 0
-TOTAL_FAILURE_COUNT = 0
+total_failure_count = 0
 
 # for GPIO4. Also, pulseio may be needed for raspberry
 dhtDevice = adafruit_dht.DHT22(board.D4, use_pulseio=False) 
@@ -137,8 +137,8 @@ while True:
 		temperature = round(temperature_raw, 1)
 		print("Raw temperature {}*C, raw humidity {}%".format(temperature_raw, humidity_raw))
 	except:
-		++TOTAL_FAILURE_COUNT
-		print("Sensor reading failed. Retry in {} secs. Total failure count: {}".format(CORRECTION_INTERVAL, TOTAL_FAILURE_COUNT))
+		total_failure_count = total_failure_count + 1
+		print("Sensor reading failed. Retry in {} secs. Total failure count: {}".format(CORRECTION_INTERVAL, total_failure_count))
 		time.sleep(CORRECTION_INTERVAL)
 		continue;
 
