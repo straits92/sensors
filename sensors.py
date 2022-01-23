@@ -17,9 +17,13 @@ import json
 import adafruit_dht
 import board
 
-# network and directory info; local server or tunneling to internet
+# command line args
+import sys
+
+# Network and directory info; local server or tunneling to internet. 
+# This info could alternatively be passed as a command line arg.
 WLAN_IP = "192.168.1.157" # static IP for Raspberry Pi Zero W
-WLAN_IP_4B = "192.168.1.158" # static IP for Raspberry Pi 4B
+WLAN_IP_4B = sys.argv[2] # static IP for Raspberry Pi 4B
 subdir = "/sensordata"
 prefix = "/sensordata_"
 local_link_hourly = WLAN_IP_4B+prefix+"hourly.json"
@@ -27,9 +31,12 @@ local_link_instant = WLAN_IP_4B+prefix+"instant.json"
 local_link_12hr = WLAN_IP_4B+prefix+"12hr.json"
 
 # time constants
-READ_INTERVAL_SECONDS = 60 # every 1 minutes
+arg_1 = sys.argv[1] # interval for reading the sensor, in seconds
+READ_INTERVAL_SECONDS = int(arg_1) # every 1 minutes
 CORRECTION_INTERVAL = 5 # if failed, try 5 seconds later
 TIMEZONE = "+01:00"
+
+print("User input for interval: {}, WLAN IP: {}".format(arg_1, WLAN_IP_4B))
 
 # housekeeping for successful sensor reading
 HOURLY_FAILURE_COUNT = 0
