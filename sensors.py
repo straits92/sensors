@@ -1,17 +1,10 @@
 # temperature and humidity sensor reading and storing as json
 
-# Set-up instructions:
-# run script from cmdline:
-# python3 ~/sensors.py
-# manage how the data is served via nginx, in directory: 
-# /etc/nginx/sites-enabled/sensortest0
-# make nginx server available via ngrok:
-# ngrok http http://192.168.1.158:80 -host-header="192.168.1.158:80"
-
 import os # os.path may be needed
 import time
 import datetime
 import json
+import re # for regular expressions
 
 # libraries for the sensors
 import adafruit_dht
@@ -21,9 +14,10 @@ import board
 import sys
 
 # Network and directory info; local server or tunneling to internet. 
-# This info could alternatively be passed as a command line arg.
-WLAN_IP = "192.168.1.157" # static IP for Raspberry Pi Zero W
+# WLAN_IP = "192.168.1.157" # static IP for Raspberry Pi Zero W
 WLAN_IP_4B = sys.argv[2] # static IP for Raspberry Pi 4B
+PICO_LOG = sys.argv[3]
+
 subdir = "/sensordata"
 prefix = "/sensordata_"
 local_link_hourly = WLAN_IP_4B+prefix+"hourly.json"
@@ -51,6 +45,21 @@ dhtDevice = adafruit_dht.DHT22(board.D4, use_pulseio=False)
 def check_response_age(period, current_time, filename):
 
 	return
+
+# helper for reading the pico log file
+def read_last_line_csv(csvfilename):
+	final_line=""
+	with open(csvfilename, "r", encoding="utf-8", errors="ignore") as csv:
+			final_line = csv.readlines()[-1]	
+	# print(final_line)
+	return final_line
+
+# extract numbers out of line
+def extract_floats(string_line):
+	array = []
+	array = re.findall("\d+\.\d+", string_line)
+	# print("0th elem: {}, 1st elem: {}".format(array[0], array[1]))
+	return array
 
 # open/overwrite a file with json data 
 def overwrite_json(new_data, filename):
@@ -135,19 +144,34 @@ if (os.path.isdir(abspath)) is not True:
 
 # sensor query and json write loop 
 current_hour = 0
+time.sleep(20) # let the pico generate a file for reading first
+print("Start looping.")
 while True:
-	# query the sensor
+	# read the pico log file
 	try: 
-		temperature_raw = dhtDevice.temperature
-		humidity_raw = dhtDevice.humidity
-		humidity = round(humidity_raw, 1)
-		temperature = round(temperature_raw, 1)
-		print("Raw temperature {}*C, raw humidity {}%".format(temperature_raw, humidity_raw))
+		measurements = []
+		pico_last_line= read_last_line_csv(PICO_LOG)
+		measurements = extract_floats(pico_last_line)
+		temperature = measurements[1]
+		humidity = measurements[0]
+		print("Pico logged temp {}*C, humidity {}%".format(temperature, humidity))
 	except:
-		total_failure_count = total_failure_count + 1
-		print("Sensor reading failed. Retry in {} secs. Total failure count: {}".format(CORRECTION_INTERVAL, total_failure_count))
+		print("Failed to read pico log.")
 		time.sleep(CORRECTION_INTERVAL)
 		continue;
+	
+	# query the sensor when directly wired to Pi 4 B
+	# ~ try: 
+		# ~ temperature_raw = dhtDevice.temperature
+		# ~ humidity_raw = dhtDevice.humidity
+		# ~ humidity = round(humidity_raw, 1)
+		# ~ temperature = round(temperature_raw, 1)
+		# ~ print("Raw temperature {}*C, raw humidity {}%".format(temperature_raw, humidity_raw))
+	# ~ except:
+		# ~ total_failure_count = total_failure_count + 1
+		# ~ print("Sensor reading failed. Retry in {} secs. Total failure count: {}".format(CORRECTION_INTERVAL, total_failure_count))
+		# ~ time.sleep(CORRECTION_INTERVAL)
+		# ~ continue;
 
 	if temperature is not None and humidity is not None:
 				
